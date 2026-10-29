@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>AI Study Planner</title>
+<style>
+:root{--ink:#16213e;--bg:#f3f6fb;--card:#fff;--line:#d9e1ee;--acc:#2447c9;--hi:#c0392b;--md:#b7791f;--lo:#2f855a;--mut:#5b6785}
+@media(prefers-color-scheme:dark){:root{--ink:#e8edf8;--bg:#0f1526;--card:#18203a;--line:#2a3558;--acc:#7c9bff;--mut:#9aa7c9}}
+*{box-sizing:border-box}body{margin:0;font:16px/1.55 Georgia,"Times New Roman",serif;background:var(--bg);color:var(--ink)}
+h1,h2,h3,button,label,input,select,textarea,th{font-family:"Trebuchet MS",system-ui,sans-serif}
+header{padding:28px 20px 8px;max-width:1100px;margin:auto}h1{margin:0;font-size:2rem}header p{color:var(--mut);margin:4px 0 0}
+main{max-width:1100px;margin:auto;padding:12px 20px 60px;display:grid;gap:18px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:18px}
+h2{margin:0 0 10px;font-size:1.15rem}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
+label{display:block;font-size:.85rem;color:var(--mut);margin-bottom:3px}
+input,select,textarea{width:100%;padding:9px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--ink);font-size:1rem}
+button{background:var(--acc);color:#fff;border:0;border-radius:6px;padding:11px 18px;font-size:1rem;cursor:pointer}
+button.alt{background:transparent;color:var(--acc);border:1px solid var(--acc)}button:disabled{opacity:.5}
+:focus-visible{outline:3px solid var(--acc);outline-offset:2px}
+details summary{cursor:pointer;color:var(--mut);font-family:"Trebuchet MS",sans-serif}
+.bar{height:14px;background:var(--line);border-radius:7px;overflow:hidden}.bar i{display:block;height:100%;width:0;background:var(--lo);transition:width .3s}
+.tag{font:600 .75rem "Trebuchet MS",sans-serif;padding:2px 8px;border-radius:99px;color:#fff}
+.High{background:var(--hi)}.Medium{background:var(--md)}.Low{background:var(--lo)}
+.topic{border-left:5px solid var(--line)}.topic.High{border-color:var(--hi);background:var(--card)}.topic.Medium{border-color:var(--md);background:var(--card)}.topic.Low{border-color:var(--lo);background:var(--card)}
+.topic h3{margin:0 0 4px;font-size:1rem}.topic small{color:var(--mut);display:block}
+.scroll{overflow-x:auto}table{border-collapse:collapse;width:100%;font-size:.92rem}th,td{border-bottom:1px solid var(--line);padding:8px;text-align:left;vertical-align:top}
+ul{margin:6px 0;padding-left:20px}.spin{display:none;align-items:center;gap:10px;color:var(--mut)}.spin.on{display:flex}
+.spin b{width:18px;height:18px;border:3px solid var(--line);border-top-color:var(--acc);border-radius:50%;animation:r .8s linear infinite}
+@keyframes r{to{transform:rotate(360deg)}}@media(prefers-reduced-motion:reduce){.spin b{animation:none}}
+.err{color:var(--hi)}[hidden]{display:none!important}
+</style></head><body>
+<header><h1>📚 AI Study Planner</h1><p>Enter your exam details. Generative AI builds a plan that fits your time.</p></header>
+<main>
+<section class="card"><h2>🎓 Your details</h2>
+<div class="grid">
+<div><label for="name">Student name</label><input id="name" value="Rahul"></div>
+<div><label for="subject">Subject</label><input id="subject" value="Generative Artificial Intelligence"></div>
+<div><label for="hours">Study hours per day</label><input id="hours" type="number" min="0.5" max="16" step="0.5" value="3"></div>
+<div><label for="exam">Exam date</label><input id="exam" type="date"></div>
+<div><label for="level">Knowledge level</label><select id="level"><option>Beginner</option><option>Intermediate</option><option>Advanced</option></select></div>
+<div><label for="style">Prompt style</label><select id="style"><option value="basic">1 – Basic</option><option value="structured">2 – Structured</option><option value="advanced" selected>3 – Advanced (expert planner)</option></select></div>
+</div>
+<div style="margin-top:12px"><label for="topics">Topics (one per line)</label>
+<textarea id="topics" rows="6">Introduction to Generative AI
+Neural Networks
+Transformers
+Large Language Models
+Prompt Engineering
+Generative AI Applications</textarea></div>
+<details style="margin-top:12px"><summary>⚙️ AI connection (API key stays in your browser)</summary>
+<div class="grid" style="margin-top:10px">
+<div><label for="base">API base URL (OpenAI-compatible)</label><input id="base" value="https://opencode.ai/zen/v1"></div>
+<div><label for="model">Model</label><input id="model" placeholder="e.g. a model shown in /models"></div>
+<div><label for="key">API key</label><input id="key" type="password" autocomplete="off"></div></div>
+<p style="color:var(--mut);font-size:.85rem">Never commit your key to GitHub. For a shared app, call the AI from a small backend instead.</p></details>
+<p><button id="go">✨ Generate Study Plan</button> <button id="quizBtn" class="alt" hidden>📝 Generate Quiz</button></p>
+<div class="spin" id="spin"><b></b><span id="spinTxt">Generating your plan…</span></div><p class="err" id="err"></p>
+</section>
+
+<div id="out" hidden>
+<section class="card"><h2>👤 Summary</h2><div id="sum"></div>
+<p style="margin:12px 0 4px">Progress: <b id="pct">0%</b></p><div class="bar"><i id="fill"></i></div></section>
+<section class="card"><h2>🎯 Topic priorities</h2><div class="grid" id="topicCards"></div></section>
+<section class="card"><h2>🗓️ Daily timetable</h2><div class="scroll"><table id="tt"></table></div></section>
+<section class="card"><h2>🔁 Revision schedule</h2><div class="scroll"><table id="rev"></table></div><p id="final"></p></section>
+<div class="grid">
+<section class="card"><h2>🧪 Practice</h2><ul id="prac"></ul></section>
+<section class="card"><h2>💡 Study tips (<span id="lv"></span>)</h2><ul id="tips"></ul></section>
+<section class="card"><h2>🏁 Exam strategy</h2><ul id="strat"></ul></section></div>
+</div>
+<section class="card" id="quiz" hidden><h2>📝 Quiz</h2><div id="quizBody"></div></section>
+</main>
+<script>
+const $=id=>document.getElementById(id);let plan=null,done=new Set();
+const d=new Date();d.setDate(d.getDate()+15);$('exam').value=d.toISOString().slice(0,10);
+for(const k of['base','model','key']){const v=localStorage.getItem('sp_'+k);if(v)$(k).value=v;$(k).onchange=()=>localStorage.setItem('sp_'+k,$(k).value)}
+const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const li=a=>(a||[]).map(x=>`<li>${esc(x)}</li>`).join('');
+const daysLeft=()=>Math.max(1,Math.ceil((new Date($('exam').value)-new Date(new Date().toDateString()))/864e5));
+const today=()=>new Date().toISOString().slice(0,10);
+
+async function ask(system,user){
+ if(!$('key').value||!$('model').value)throw new Error('Open "AI connection" and enter the model name and API key.');
+ const r=await fetch($('base').value.replace(/\/$/,'')+'/chat/completions',{method:'POST',
+  headers:{'Content-Type':'application/json',Authorization:'Bearer '+$('key').value},
+  body:JSON.stringify({model:$('model').value,messages:[{role:'system',content:system},{role:'user',content:user}]})});
+ if(!r.ok)throw new Error('API error '+r.status+': '+(await r.text()).slice(0,200));
+ const t=(await r.json()).choices[0].message.content;
+ const m=t.match(/\{[\s\S]*\}/);if(!m)throw new Error('AI did not return JSON. Try again.');
+ return JSON.parse(m[0]);
+}
+const styles={
+ basic:'Create a study plan for this student.',
+ structured:'Create a {N}-day study plan and divide the topics into daily targets. Include revision and practice sessions.',
+ advanced:"Act as an expert academic study planner. Analyze the student's subjects, available study time, knowledge level and examination date. Create an optimized study plan that prioritizes difficult and important topics. Balance learning, practice and revision. Explain why each topic has been assigned its priority and provide an exam-focused revision strategy."};
+const schema=`Reply with ONLY valid JSON (no markdown) in this shape:
+{"overview":"string","topics":[{"name":"","priority":"High|Medium|Low","reason":"","difficult":true,"minutes":0,"revisionDate":"YYYY-MM-DD"}],
+"timetable":[{"day":1,"date":"YYYY-MM-DD","target":"","sessions":[{"topic":"","minutes":0,"activity":"learn|practice|revise"}]}],
+"revisionPlan":[{"date":"YYYY-MM-DD","focus":""}],"practice":[""],"importantTopics":[""],"tips":[""],"examStrategy":[""],"finalRevision":""}
+Daily total minutes must not exceed the available hours. Every topic must appear. Tips must suit the knowledge level.`;
+
+$('go').onclick=async()=>{
+ const topics=$('topics').value.split('\n').map(s=>s.trim()).filter(Boolean);
+ if(!topics.length||!$('exam').value)return $('err').textContent='Add topics and an exam date.';
+ const N=daysLeft(),ctx=`Student: ${$('name').value}
+Subject: ${$('subject').value}
+Topics: ${topics.join('; ')}
+Study time: ${$('hours').value} hours/day
+Today: ${today()}  Exam date: ${$('exam').value} (${N} days left)
+Knowledge level: ${$('level').value}`;
+ busy(true,'Generating your plan…');
+ try{plan=await ask('You are a study-planning assistant that outputs JSON only.',styles[$('style').value].replace('{N}',N)+'\n\n'+ctx+'\n\n'+schema);
+  done=new Set();render();$('quizBtn').hidden=false;$('quiz').hidden=true;$('out').hidden=false;$('out').scrollIntoView({behavior:'smooth'})}
+ catch(e){$('err').textContent=e.message}finally{busy(false)}};
+
+function busy(b,t){$('go').disabled=$('quizBtn').disabled=b;$('spin').classList.toggle('on',b);if(t)$('spinTxt').textContent=t;if(b)$('err').textContent=''}
+
+function render(){const p=plan;
+ $('sum').innerHTML=`<p><b>${esc($('name').value)}</b> · ${esc($('subject').value)} · exam on <b>${esc($('exam').value)}</b> (${daysLeft()} days) · ${esc($('hours').value)} h/day</p><p>${esc(p.overview)}</p>`;
+ $('topicCards').innerHTML=p.topics.map((t,i)=>`<div class="card topic ${esc(t.priority)}"><label style="color:inherit;display:flex;gap:8px;align-items:flex-start"><input type="checkbox" style="width:auto;margin-top:5px" data-i="${i}"><span><h3>${esc(t.name)} <span class="tag ${esc(t.priority)}">${esc(t.priority)}</span>${t.difficult?' ⚠️':''}</h3><small>${esc(t.reason)}</small><small>⏱ ${esc(t.minutes)} min total · revise on ${esc(t.revisionDate)}</small></span></label></div>`).join('');
+ document.querySelectorAll('#topicCards input').forEach(c=>c.onchange=()=>{c.checked?done.add(+c.dataset.i):done.delete(+c.dataset.i);progress()});
+ $('tt').innerHTML='<tr><th>Day</th><th>Target</th><th>Sessions</th></tr>'+p.timetable.map(r=>`<tr><td>${esc(r.day)}<br><small>${esc(r.date)}</small></td><td>${esc(r.target)}</td><td>${(r.sessions||[]).map(s=>`${esc(s.topic)} – ${esc(s.minutes)} min (${esc(s.activity)})`).join('<br>')}</td></tr>`).join('');
+ $('rev').innerHTML='<tr><th>Date</th><th>Focus</th></tr>'+(p.revisionPlan||[]).map(r=>`<tr><td>${esc(r.date)}</td><td>${esc(r.focus)}</td></tr>`).join('');
+ $('final').innerHTML='<b>Final revision:</b> '+esc(p.finalRevision);
+ $('prac').innerHTML=li(p.practice)+li((p.importantTopics||[]).map(x=>'Focus: '+x));
+ $('lv').textContent=$('level').value;$('tips').innerHTML=li(p.tips);$('strat').innerHTML=li(p.examStrategy);progress()}
+function progress(){const n=plan.topics.length,pc=Math.round(done.size/n*100);$('pct').textContent=`${pc}% (${done.size}/${n} topics)`;$('fill').style.width=pc+'%'}
+
+$('quizBtn').onclick=async()=>{busy(true,'Writing your quiz…');
+ try{const q=await ask('You are an exam-question writer that outputs JSON only.',
+ `Subject: ${$('subject').value}\nTopics: ${plan.topics.map(t=>t.name).join('; ')}\nLevel: ${$('level').value}\nCreate 5 MCQs and 5 short-answer questions. JSON only:
+{"mcq":[{"q":"","options":["","","",""],"answer":"exact text of correct option","difficulty":"Easy|Medium|Hard","explanation":""}],
+"short":[{"q":"","answer":"","difficulty":"Easy|Medium|Hard","explanation":""}]}`);
+ $('quizBody').innerHTML='<h3>Multiple choice</h3>'+q.mcq.map((m,i)=>`<div class="card" style="margin-bottom:10px"><b>Q${i+1}. ${esc(m.q)}</b> <span class="tag Medium">${esc(m.difficulty)}</span><ul>${m.options.map(o=>`<li>${esc(o)}</li>`).join('')}</ul><details><summary>Show answer</summary><p><b>${esc(m.answer)}</b><br>${esc(m.explanation)}</p></details></div>`).join('')
+ +'<h3>Short answer</h3>'+q.short.map((m,i)=>`<div class="card" style="margin-bottom:10px"><b>Q${i+6}. ${esc(m.q)}</b> <span class="tag Medium">${esc(m.difficulty)}</span><details><summary>Show answer</summary><p><b>${esc(m.answer)}</b><br>${esc(m.explanation)}</p></details></div>`).join('');
+ $('quiz').hidden=false;$('quiz').scrollIntoView({behavior:'smooth'})}
+ catch(e){$('err').textContent=e.message}finally{busy(false)}};
+</script></body></html>
